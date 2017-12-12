@@ -2,10 +2,11 @@ package utils;
 
 import java.util.Arrays;
 import java.util.List;
-import utils.enums.SortMethod;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
+
+import utils.enums.SortMethod;
 import utils.sorting.algorithms.Bubble;
 import utils.sorting.algorithms.Insertion;
 import utils.sorting.algorithms.Quick;
@@ -14,84 +15,86 @@ import utils.sorting.algorithms.SortThread;
 
 public class Sorter<T extends Comparable<? super T>> {
 
-    private SortMethod sortMethod;
-    private final UtilityArray utilityArray;
-    private final Queue<T[]> sortedArrays;
+	private SortMethod sortMethod;
+	private final UtilityArray<T> utilityArray;
+	private final Queue<T[]> sortedArrays;
 
-    public Sorter(UtilityArray utilityArray) {
-        sortedArrays = new ConcurrentLinkedQueue<>();
-        this.utilityArray = utilityArray;
-    }
+	public Sorter(UtilityArray<T> utilityArray) {
+		sortedArrays = new ConcurrentLinkedQueue<>();
+		this.utilityArray = utilityArray;
+	}
 
-    public Queue<T[]> getSortedArrays() {
-        return sortedArrays;
-    }
+	@SuppressWarnings("hiding")
+	public void execute() {
+		List<SortThread<T>> collect = null;
+		switch (sortMethod) {
+		case SELECTION:
+			collect = Arrays.asList(utilityArray.getChunkedArray()).parallelStream()
+					.map(subArr -> new SortThread<T>(subArr) {
+						@Override
+						public <T extends Comparable<? super T>> void sort(T[] sortableArray) {
+							Selection.sort(sortableArray);
+						}
+					}).collect(Collectors.toList());
+			break;
+		case INSERTION:
+			collect = Arrays.asList(utilityArray.getChunkedArray()).parallelStream()
+					.map(subArr -> new SortThread<T>(subArr) {
+						@Override
+						public <T extends Comparable<? super T>> void sort(T[] sortableArray) {
+							Insertion.sort(sortableArray);
+						}
+					}).collect(Collectors.toList());
+			break;
+		case BUBBLE:
+			collect = Arrays.asList(utilityArray.getChunkedArray()).parallelStream()
+					.map(subArr -> new SortThread<T>(subArr) {
+						@Override
+						public <T extends Comparable<? super T>> void sort(T[] sortableArray) {
+							Bubble.sort(sortableArray);
+						}
+					}).collect(Collectors.toList());
+			break;
+		case QUICK:
+			collect = Arrays.asList(utilityArray.getChunkedArray()).parallelStream()
+					.map(subArr -> new SortThread<T>(subArr) {
+						@Override
+						public <T extends Comparable<? super T>> void sort(T[] sortableArray) {
+							Quick.sort(sortableArray);
+						}
+					}).collect(Collectors.toList());
+			break;
+		default:
+			throw new UnsupportedOperationException("No algorithm selected.");
+		}
 
-    public SortMethod getSortMethod() {
-        return sortMethod;
-    }
+		/* Start the workers! Seize the means of production. */
+		collect.parallelStream().forEach(thread -> thread.start());
 
-    public void setSortMethod(SortMethod sortMethod) {
-        this.sortMethod = sortMethod;
-    }
+		/* ~Seize~ Wait for the goods. */
+		collect.parallelStream().forEach(thread -> {
+			try {
+				thread.join();
+			} catch (InterruptedException ex) {
+				/* do nothing */ }
+		});
 
-    public void execute() {
-        List<SortThread<T>> collect = null;
-        switch (sortMethod) {
-            case SELECTION:
-                collect = Arrays.asList(utilityArray.getChunkedArray()).parallelStream()
-                        .map(subArr -> new SortThread<T>(subArr) {
-                    @Override
-                    public <T extends Comparable<? super T>> void sort(T[] sortableArray) {
-                        Selection.sort(sortableArray);
-                    }
-                }).collect(Collectors.toList());
-                break;
-            case INSERTION:
-                collect = Arrays.asList(utilityArray.getChunkedArray()).parallelStream()
-                        .map(subArr -> new SortThread<T>(subArr) {
-                    @Override
-                    public <T extends Comparable<? super T>> void sort(T[] sortableArray) {
-                        Insertion.sort(sortableArray);
-                    }
-                }).collect(Collectors.toList());
-                break;
-            case BUBBLE:
-                collect = Arrays.asList(utilityArray.getChunkedArray()).parallelStream()
-                        .map(subArr -> new SortThread<T>(subArr) {
-                    @Override
-                    public <T extends Comparable<? super T>> void sort(T[] sortableArray) {
-                        Bubble.sort(sortableArray);
-                    }
-                }).collect(Collectors.toList());
-                break;
-            case QUICK:
-                collect = Arrays.asList(utilityArray.getChunkedArray()).parallelStream()
-                        .map(subArr -> new SortThread<T>(subArr) {
-                    @Override
-                    public <T extends Comparable<? super T>> void sort(T[] sortableArray) {
-                        Quick.sort(sortableArray);
-                    }
-                }).collect(Collectors.toList());
-                break;
-            default:
-                throw new UnsupportedOperationException("No algorithm selected.");
-        }
+		/* Seize the goods. */
+		collect.parallelStream().map(SortThread::getInternalArray).forEach(array -> sortedArrays.offer(array));
+	} /*
+		 * Java streams here are faster due to the ordering of the chunks being
+		 * irrelevant and parallelism can be achieved through means of concurrency here.
+		 */
 
-        /* Start the workers! Seize the means of production. */
-        collect.parallelStream().forEach(thread -> thread.start());
+	public Queue<T[]> getSortedArrays() {
+		return sortedArrays;
+	}
 
-        /* ~Seize~ Wait for the goods. */
-        collect.parallelStream()
-                .forEach(thread -> {
-                    try {
-                        thread.join();
-                    } catch (InterruptedException ex) { /* do nothing */ }
-                });
-        
-        /* Seize the goods. */
-        collect.parallelStream()
-                .map(SortThread::getInternalArray)
-                .forEach(array -> sortedArrays.offer(array));
-    } /* Java streams here are faster due to the ordering of the chunks being irrelevant and parallelism can be achieved through means of concurrency here. */
+	public SortMethod getSortMethod() {
+		return sortMethod;
+	}
+
+	public void setSortMethod(SortMethod sortMethod) {
+		this.sortMethod = sortMethod;
+	}
 }

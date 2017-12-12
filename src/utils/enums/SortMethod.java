@@ -1,5 +1,5 @@
 package utils.enums;
 
 public enum SortMethod {
-    SELECTION, BUBBLE, INSERTION, QUICK
+	SELECTION, BUBBLE, INSERTION, QUICK
 }
